@@ -37,7 +37,7 @@ def welcome():
         f"/api/v1.0/tobs<br/>"
         f"/api/v1.0/start<br/>"
         f"/api/v1.0/start/end<br/>"
-        f"Please use YYYY-mm-dd for both start and end date format to access the data"
+        f"<br/>**Note**<br/>Please use YYYY-MM-DD for both start and end date format to access the data"
 
     )
 
@@ -46,8 +46,11 @@ def precipitation():
     # Create our session (link) from Python to the DB
     session = Session(bind=engine)
 
+    # Find the most recent date in the data set.
+    recent_date = session.query(Measurement.date).order_by(Measurement.date.desc()).first()
+
     # Get the last 12 months date frm the recent date
-    last_12_months = dt.date(2017,8,23) - dt.timedelta(days=365)
+    last_12_months = dt.datetime.strptime(recent_date[0],'%Y-%m-%d').date() - dt.timedelta(days=365)
 
     # Query the prcp results and the date
     prcp_result = session.query(Measurement.date, Measurement.prcp).filter(Measurement.date>=last_12_months).all()
@@ -76,7 +79,7 @@ def stations():
     station_df = pd.DataFrame(stations, columns=['ID', 'Station','Name','Latitude','Longitude','Elevation'])
     
     # Convert dataframe to dictionary
-    station_dict = station_df.set_index('Station').T.to_dict('list')
+    station_dict = station_df.set_index('ID').T.to_dict('list')
 
     # Close the session
     session.close()
@@ -89,12 +92,15 @@ def tobs():
     # Create our session (link) from Python to the DB
     session = Session(bind=engine)
 
-    # Get the last 12 months date frm the recent date
-    last_12_months = dt.date(2017,8,18) - dt.timedelta(days=365)
-
     # Get the most active station name
     mostActiveStation = session.query(Measurement.station).group_by(Measurement.station).\
     order_by(func.count(Measurement.station).desc()).first()
+
+    # Get the recent date from the most active station id
+    recent_date = session.query(Measurement.date).filter(Measurement.station == mostActiveStation[0]).order_by(Measurement.date.desc()).first()
+
+    # Get the last 12 months date frm the recent date
+    last_12_months = dt.datetime.strptime(recent_date[0],'%Y-%m-%d').date() - dt.timedelta(days=365)
 
     # Query the dates and temperature observations of the most-active station for the previous year
     tobs_result = session.query(Measurement.date, Measurement.tobs).filter(Measurement.date>=last_12_months, Measurement.station == mostActiveStation[0]).all()
